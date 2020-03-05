@@ -193,7 +193,7 @@ def main():
 
     os.makedirs(outdir, exist_ok=True)
 
-    all_oligos = {}
+    all_oligos_df = pd.DataFrame()
 
     in_file_names = []
     for f in os.listdir(indir):
@@ -202,10 +202,10 @@ def main():
         else:
             in_file_names.append(f)
 
-    for in_file in in_file_names:
-        print(f"Designing oligos for {in_file}.")
+    for in_file_name in in_file_names:
+        print(f"Designing oligos for {in_file_name}.")
         
-        for record in SeqIO.parse(f"{indir}/{in_file}", 'fasta'):
+        for record in SeqIO.parse(f"{indir}/{in_file_name}", 'fasta'):
             in_record = record
 
         in_seq = in_record.seq
@@ -225,34 +225,43 @@ def main():
         for oligo in cleaned_oligos:
             translated_oligo = translate(oligo)
             final_oligo = adaptor5 + oligo + adaptor3
-            oligos_with_translation.append((final_oligo, translated_oligo, oligo_count))
+            if (oligo_count*tile + oligo_length) <= (len(dna_seq)):
+                oligo_start = (oligo_count*tile)/3 + 1
+            else:
+                oligo_start = (len(dna_seq) - oligo_length)/3 + 1
+            oligos_with_translation.append((in_file_name[0:-6], final_oligo,
+                                            translated_oligo, oligo_count, oligo_start))
             oligo_count += 1 # Keep track of oligo number separately for each file
+        
+        print(f"{in_file_name} is {len(dna_seq)//3} amino acids long.")
+        print(f"{len(oligos_with_translation)} oligos designed for {in_file_name}.\n")
+        
+        oligos_df = pd.DataFrame(oligos_with_translation,
+                                 columns=['Name', 'Oligo', 'Prot', 'Oligo_Num', 'Prot_Start'])
 
-        all_oligos[in_file] = oligos_with_translation
+        all_oligos_df = pd.concat([all_oligos_df, oligos_df], ignore_index=True)
 
-    all_oligos_df = pd.DataFrame.from_dict(all_oligos, orient='index').transpose()
-    all_oligos_df = pd.melt(all_oligos_df, value_vars=in_file_names, var_name='File_Name', value_name='Oligo_Info')
-
-
-    all_oligos_df = all_oligos_df[all_oligos_df['Oligo_Info'] != None]
-
-
-    all_oligos_df[['Oligo', 'Prot', 'Count']] = all_oligos_df['Oligo_Info'].apply(pd.Series)
     print(f"{len(all_oligos_df)} oligos designed.")
-    print(all_oligos_df)
-    all_oligos_df.to_csv(f"{outdir}/oligos_withdups.txt", index_label='Oligo_Num', 
-            columns=['File_Name', 'Oligo'])
-    all_oligos_df = all_oligos_df.drop(['Oligo_Info'], axis=1).drop_duplicates(['Prot'], keep='first')
-    print(f"{len(all_oligos_df)} oligos remain after dropping duplicate protein sequences.")
-    print(all_oligos_df)
-    all_oligos_df.to_csv(f"{outdir}/oligos_nodups.txt", index_label='Oligo_Num', 
-            columns=['File_Name', 'Oligo'])
+    all_oligos_df.to_csv(f"{outdir}/oligos_all.txt", index_label='Index', 
+            columns=['Name', 'Oligo', 'Prot', 'Prot_Start'])
+    
+    
+    all_dup_info = pd.DataFrame(columns = ['Dup_Seq', 'Num', 'Seq_Names'])
+    all_oligos_df_dups = all_oligos_df[all_oligos_df.duplicated(['Prot'], keep=False)].reset_index()
+    all_oligos_df_dups.to_csv(f"{outdir}/oligos_dups.txt", index_label='Index', 
+            columns=['Name', 'Oligo', 'Prot', 'Prot_Start'])
+    dup_seqs = all_oligos_df_dups.groupby('Prot')
+    for seq, info in dup_seqs:
+        dup_info = {'Dup_Seq': seq, 'Dup_Count': len(info),
+                    'Seq_Names': [info['Name'].to_list()]}
+        all_dup_info = pd.concat([all_dup_info, pd.DataFrame.from_dict(dup_info)], sort=False)
+    all_dup_info.to_csv(f"{outdir}/oligos_dup_counts.txt", sep='\t', index_label='Index',
+                        columns=['Dup_Seq', 'Dup_Count', 'Seq_Names'])
 
-    # with open(final_seqs_file, 'w') as f:
-    #     for oligo in range(len(final_oligos)):
-    #         f.write(','.join((prot_file, str(oligo*tile+1) + 'to' + str(oligo*tile+1+oligo_length), final_oligos[oligo] + '\n')))
-
-
+    all_oligos_df_nodups = all_oligos_df.drop_duplicates(['Prot'], keep='first')
+    print(f"{len(all_oligos_df_nodups)} oligos remain after dropping duplicate protein sequences.")
+    all_oligos_df_nodups.to_csv(f"{outdir}/oligos_nodups.txt", index_label='Index', 
+            columns=['Name', 'Oligo', 'Prot', 'Prot_Start'])
 
 
 
