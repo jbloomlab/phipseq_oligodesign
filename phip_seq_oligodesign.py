@@ -169,7 +169,7 @@ def remove_rsites(oligos, codon_scores_by_aa, avoidmotifs):
                 assert aa_withrs == translate(oligos[n]), 'The amino acid sequence has been altered by removing restriction site.'
 
     print(f"{rsites_count} restriction sites were removed with synonymous substitution.")
-    #print oligos
+
     return oligos
 
 
