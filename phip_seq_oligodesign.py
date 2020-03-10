@@ -83,18 +83,24 @@ def translate(oligo):
     True
     """
     assert len(oligo) % 3 == 0, "Not translatable due to length"
-    aa_read = ''.join([translation_table[oligo[i : i + 3]] for i in range(0, len(oligo), 3)])
+    aa_read = ''.join([translation_table[oligo[i : i + 3]] 
+                      for i in range(0, len(oligo), 3)])
     return aa_read
 
 
-def reverse_translate(protein_seq): 
+def reverse_translate(protein_seq, seq_name): 
     """ Reverse_translate viral protein sequence into DNA sequence.
 
-    Codon preferences based on cai for E. coli."""
+    Codon preferences based on cai for E. coli.
+
+    *seq_name* provided to provide useful error message.
+    """
     revtranslated_seq = []
 
     for aa in protein_seq: #Go through seq aa by aa
-        assert aa in rt_table, 'Ambiguous Sequence. Check {0} for accuracy of protein sequence.'.format(protein_sequence)
+        if aa not in rt_table:
+            raise ValueError(f"Ambiguous sequence. Check {seq_name}"
+                             " for accuracy of protein sequence.")
         max_codon = max(score_dict[aa], key=lambda item:item[1])[0]
         revtranslated_seq.append(max_codon)
 
@@ -104,16 +110,18 @@ def reverse_translate(protein_seq):
 
 
 def subsequence(genome, oligo_length, tile):
+    """ Subsequence viral sequence into oligos.
 
-    """ Subsequence viral genome into oligos of length *oligo_length* tiled by *tile*."""
+    These oligos have length *oligo_length* tiled by *tile*.
+    """
     subsequences = []
     i = 0
 
     while i < (len(genome) - oligo_length):
         subsequences.append(genome[i : i + oligo_length])
         i = i + tile
-
-    subsequences.append(genome[len(genome)-oligo_length: len(genome)]) #The final oligo goes from the end of the sequence backwards oligo length.
+    # The final oligo goes from the end of the seq backwards oligo_length.
+    subsequences.append(genome[len(genome)-oligo_length: len(genome)]) 
 
     return subsequences
 
@@ -132,35 +140,51 @@ def remove_rsites(oligos, codon_scores_by_aa, avoidmotifs):
                 replace = True
                 while replace:
                     for i in range(len(oligos[n]) - len(motif) + 1):
-                        seq = oligos[n][i : i + len(motif)] # sequence starting at i
+                        # sequence starting at i
+                        seq = oligos[n][i : i + len(motif)] 
                         if seq == motif:
-                            done = False #need to replace a codon in this seq
+                            done = False # need to replace a codon in this seq
                             rsites_count += 1
-                            if i % 3 == 0: #The restriction site is in frame.
-                                for x in codon_scores_by_aa: #For each amino acid...
-                                    for y in codon_scores_by_aa[x]: #...And for each (codon, score) tuple that encodes that aa...
-                                        if not done: #If the codon at this location has not already been replaced.
-                                            if oligos[n][i:i+3] in y: #If the codon we want to replace is in the score tuple y... 
-                                                l = codon_scores_by_aa[x] #...Turn all synonymous codons and their scores into a list
+                            if i % 3 == 0: # The restriction site is in frame.
+                                # For each amino acid...
+                                for aa in codon_scores_by_aa: 
+                                    # ...And for each (codon, score) tuple that encodes that aa...
+                                    for codon_tup in codon_scores_by_aa[aa]: 
+                                        # If the codon at this location has not already been replaced.
+                                        if not done: 
+                                            # If the codon we want to replace is in the score tuple y... 
+                                            if oligos[n][i:i+3] in codon_tup: 
+                                                # ...Turn all synonymous codons and their scores into a list
+                                                l = codon_scores_by_aa[aa]
                                                 l.sort(key=itemgetter(1),reverse=True)
-                                                assert oligos[n][i:i+3] == l[0][0], 'The codon we are replacing is not the highest scoring. We are replacing: {0}'.format(oligos[n][i:i+3])
-                                                new_codon = l[1][0] # The new codon is the codon that has the second highset score (so is second in the sorted list)
+                                                # If not replacing highest scoring codon, raise error
+                                                if oligos[n][i:i+3] != l[0][0]:
+                                                    raise ValueError("The codon we are replacing is not the highest scoring."
+                                                                    f"We are replacing: {oligos[n][i:i+3]}")
+                                                # The new codon is the codon with the second highset score,
+                                                # so is second in the sorted list.
+                                                new_codon = l[1][0]
                                                 clean_oligo = oligos[n][:i]+new_codon+oligos[n][i+3:]
                                                 oligos[n] = clean_oligo
-                                                done = True #The codon has been replaced, don't look at this site anymore. 
+                                                # The codon has been replaced, don't look at this site anymore. 
+                                                done = True 
 
                             else: #The restriction site is not in frame. Go through the same steps as if it were. 
-                                for x in codon_scores_by_aa:
-                                    for y in codon_scores_by_aa[x]:
+                                for aa in codon_scores_by_aa:
+                                    for codon_tup in codon_scores_by_aa[aa]:
                                         if not done:
-                                            if oligos[n][i-(i%3):i-(i%3)+3] in y: #Replace the first codon that contains part of the restriciton site.
-                                                l = codon_scores_by_aa[x]
+                                            # Replace the first codon that contains part of the restriciton site.
+                                            if oligos[n][i-(i%3):i-(i%3)+3] in codon_tup:
+                                                l = codon_scores_by_aa[aa]
                                                 l.sort(key=itemgetter(1), reverse=True)
-                                                assert oligos[n][i-(i%3):i-(i%3)+3] == l[0][0], 'The codon we are replacing is not the highest scoring. We are replacing: {0}'.format(oligos[n][i-(i%3):i-(i%3)+3])
+                                                if oligos[n][i-(i%3):i-(i%3)+3] != l[0][0]:
+                                                    raise ValueError("The codon we are replacing is not the highest scoring."
+                                                                     f"We are replacing: {oligos[n][i-(i%3):i-(i%3)+3]}")
                                                 new_codon = l[1][0]
                                                 clean_oligo = oligos[n][:i-(1%3)]+new_codon+oligos[n][i-(i%3)+3:]
                                                 oligos[n] = clean_oligo
-                                                done = True #The codon has been replaced, don't look at other possible synonymous codons.
+                                                # The codon has been replaced, don't look at other possible synonymous codons.
+                                                done = True 
 
                     if motif not in oligos[n]: #Make sure motif not in oligo after going through replacements
                         replace = False
@@ -210,9 +234,11 @@ def main():
 
         in_seq = in_record.seq
         if input_type == 'protein':
-            dna_seq = reverse_translate(in_seq)
+            dna_seq = reverse_translate(in_seq, in_file_name)
             assert in_seq == translate(dna_seq), "reverse translation did not work"
         elif input_type == 'dna':
+            assert set(in_seq.upper()) == set('ACTG'),\
+                f"Input sequence {in_file_name} has ambiguous nucleotides."
             dna_seq = in_seq
         else:
             raise ValueError(f"Invalid input type of: {input_type}.")

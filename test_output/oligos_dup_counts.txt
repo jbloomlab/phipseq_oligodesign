@@ -1,2 +1,0 @@
-Index	Dup_Seq	Dup_Count	Seq_Names
-0	VTGDNDDEDVVTGDNDDEDVVTGDNDDEDVVTGDNDDED	2.0	['HKU1_orf1ab_polyprotein', 'HKU1_orf1ab_polyprotein']
