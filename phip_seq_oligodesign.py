@@ -88,19 +88,17 @@ def translate(oligo):
     return aa_read
 
 
-def reverse_translate(protein_seq, seq_name): 
+def reverse_translate(protein_seq): 
     """ Reverse_translate viral protein sequence into DNA sequence.
 
     Codon preferences based on cai for E. coli.
-
-    *seq_name* provided to provide useful error message.
     """
     revtranslated_seq = []
 
     for aa in protein_seq: #Go through seq aa by aa
         if aa not in rt_table:
-            raise ValueError(f"Ambiguous sequence. Check {seq_name}"
-                             " for accuracy of protein sequence.")
+            raise ValueError("Ambiguous sequence. Check file for"
+                             " accuracy of protein sequence.")
         max_codon = max(score_dict[aa], key=lambda item:item[1])[0]
         revtranslated_seq.append(max_codon)
 
@@ -234,12 +232,15 @@ def main():
 
         in_seq = in_record.seq
         if input_type == 'protein':
-            dna_seq = reverse_translate(in_seq, in_file_name)
+            dna_seq = reverse_translate(in_seq)
             assert in_seq == translate(dna_seq), "reverse translation did not work"
         elif input_type == 'dna':
             assert set(in_seq.upper()) == set('ACTG'),\
                 f"Input sequence {in_file_name} has ambiguous nucleotides."
-            dna_seq = in_seq
+            if len(in_seq)%3 != 0:
+                raise ValueError(f"Input sequence {in_file_name} not divisible"
+                                 " by 3. Check that sequence is protein-coding.")
+            dna_seq = str(in_seq)
         else:
             raise ValueError(f"Invalid input type of: {input_type}.")
 
@@ -272,7 +273,7 @@ def main():
             columns=['Name', 'Oligo', 'Prot', 'Prot_Start'])
     
     
-    all_dup_info = pd.DataFrame(columns = ['Dup_Seq', 'Num', 'Seq_Names'])
+    all_dup_info = pd.DataFrame(columns = ['Dup_Seq', 'Dup_Count', 'Seq_Names'])
     all_oligos_df_dups = all_oligos_df[all_oligos_df.duplicated(['Prot'], keep=False)].reset_index()
     all_oligos_df_dups.to_csv(f"{outdir}/oligos_dups.txt", index_label='Index', 
             columns=['Name', 'Oligo', 'Prot', 'Prot_Start'])
