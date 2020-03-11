@@ -20,13 +20,13 @@ If you do not, please look into installing `miniconda` [here](https://docs.conda
 
 First, clone this repository to your local computer using:
 
-    > git clone https://github.com/jbloomlab/phipseq_oligodesign.git
+    git clone https://github.com/jbloomlab/phipseq_oligodesign.git
 
 Then, from within the `phipseq_oligodesign` directory, create the conda environment and activate it by running:
 
-    > conda env create -f environment.yml
+    conda env create -f environment.yml
 
-    > conda activate phipseq
+    conda activate phipseq
 
 Now, everything should be set-up to run the script and design oligos.
 
@@ -34,13 +34,13 @@ In order to design oligos, all protein or dna sequences for design oligos from m
 
 To run the `phipseq_oligodesign.py` script run:
     
-    > python phipseq_oligoodesign.py input_dir output_dir seq_type
+    python phipseq_oligoodesign.py input_dir output_dir seq_type
 
 Where `seq_type` is either 'protein' or 'dna'.
 
 Additional settings (such as oligo length, overlap length, etc.) can be specified using optional arguments. For additional information on these arguments and to see their default values run:
 
-    > python phipseq_oligodesign.py -h
+    python phipseq_oligodesign.py -h
 
 
 ### Output
